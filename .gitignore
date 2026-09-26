@@ -1,0 +1,27 @@
+# Secrets: API keys live in backend/.env. Never commit it.
+# backend/.env.example is the template that is committed.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local SQLite database (rebuilt from seed data on first start)
+*.db
+*.db-journal
+
+# Frontend dependencies and build output (start.sh builds dist/)
+node_modules/
+frontend/dist/
+frontend/dist-demo/
+
+# OS, editors, archives, logs
+.DS_Store
+.vscode/
+.idea/
+*.zip
+*.log

@@ -1,0 +1,6 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-dotenv>=1.0     # loads backend/.env
+typesafe-sdk>=0.7.1    # Jev / TypeSafe System One (JEV_MODE=live)
+openai>=1.40           # Groq gpt-oss-20b via OpenAI-compatible API (LLM_PROVIDER=groq)
+anthropic>=0.40        # Claude (LLM_PROVIDER=anthropic)
