@@ -344,6 +344,16 @@ def build_jev_questions():
                         "Charges or order tracking"
                     ),
                 },
+                "general": {
+                    "what": (
+                        "Greetings, small talk, thanks, or "
+                        "questions about what support can do"
+                    ),
+                    "not_for": (
+                        "Anything about a charge, an order "
+                        "or account access"
+                    ),
+                },
             },
         ),
         # ====================================================
@@ -1046,9 +1056,14 @@ Never expose credentials.
 """,
     "general_support": """
 You are a general customer support specialist.
+You handle greetings, small talk and questions that
+are not yet about billing, orders or an account.
+For a greeting, greet the customer back and ask how
+you can help. You can help with orders, billing and
+account access.
 Answer using the information provided.
-If the issue requires human assistance,
-use create_human_case.
+Use create_human_case only if the customer asks for
+a person or the issue clearly needs one.
 """,
 }
 # ============================================================
@@ -1258,6 +1273,22 @@ def run_claude_agent(
 # ============================================================
 # TRACE HELPERS (what the UI shows, never sent to the models)
 # ============================================================
+def escalation_reply(name: str | None, case_id: str) -> str:
+    """Fixed text (no LLM) so the member always hears back
+    when Python hands the ticket to a person."""
+    if name is None:
+        return (
+            "Thanks for your message. We couldn't match this email "
+            "address to a member account, so I've passed it to our "
+            f"support team (case {case_id}). Someone will follow up with you."
+        )
+    return (
+        f"Hi {name.split()[0]}, thanks for your message. I've passed it "
+        f"to a member of our support team (case {case_id}), and they'll "
+        "follow up with you here soon."
+    )
+
+
 def serialize_answers(answers) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in answers.items():
@@ -1319,6 +1350,7 @@ def handle_customer_ticket(
             priority="normal",
         )
         db.update_ticket(ticket.id, status="escalated", route="unknown_customer")
+        db.add_message(ticket.id, "agent", escalation_reply(None, human_case["case_id"]))
         db.add_message(ticket.id, "system", f"Escalated to a person: case {human_case['case_id']}.")
         trace["route"] = "unknown_customer"
         trace["human_case"] = human_case
@@ -1421,6 +1453,7 @@ def handle_customer_ticket(
             route="human_review",
             priority=human_case["priority"],
         )
+        db.add_message(ticket.id, "agent", escalation_reply(customer.name, human_case["case_id"]))
         db.add_message(ticket.id, "system", f"Escalated to a person: case {human_case['case_id']}.")
         trace["route"] = "human_review"
         trace["priority"] = human_case["priority"]

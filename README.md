@@ -53,7 +53,7 @@ flowchart TD
 
 | Question | Type | Used for |
 |----------|------|----------|
-| `topic`: which team should handle it? | Choice | Routing to the billing, orders or account specialist. Below 0.75 confidence, the ticket goes to human review. |
+| `topic`: which team should handle it? | Choice | Routing to the billing, orders, account or general specialist. `general` covers greetings and small talk. Below 0.75 confidence, the ticket goes to human review. |
 | `requests_credentials` | Noul (0–1) | Spam score, weight 0.45 |
 | `sender_identity_mismatch` | Noul | Spam score, weight 0.30 |
 | `unexpected_reward` | Noul | Spam score, weight 0.25 |
@@ -63,6 +63,8 @@ flowchart TD
 | `repeat_contact` | Noul | High priority when Jev says "same unresolved issue" **and** Python counts 2+ contacts in 7 days |
 
 A spam score of 0.60 or more quarantines the ticket. Between 0.40 and 0.60 it goes to a person.
+
+Every member gets a reply except quarantined phishing. When Python hands a ticket to a person, Jeva tells the member and gives the case number. That message is fixed text, so no LLM is involved.
 
 ## Quick start
 
@@ -120,12 +122,13 @@ The chips under the chat run these scenarios. The seed data includes a member, J
 
 | Example | What happens |
 |---------|--------------|
+| Type **hi** | Jev picks `general`, and Jeva greets the member and asks how she can help. |
 | **Where's my order?** | Memory finds 3 earlier contacts about A-104, so it's a repeat contact with high priority. `get_order_status` runs. |
 | **Follow-up: sign for it?** | Same ticket. Earlier turns are replayed, so the LLM knows what "it" means. It says the order data doesn't cover signatures instead of guessing. |
 | **Charged twice** | `create_refund` refunds the duplicate charge on A-101. Asking again returns the same refund, because refunds are idempotent per ticket. |
 | **Can't sign in** | `reset_password` sends a link. Only a hash of the token is stored, and the LLM never sees the token. |
 | **Suspicious prize** | A spoofed "Rewards Team" sender asks for a password and claims a reward. Quarantined, and no LLM is called. |
-| **Not sure who to ask** | Low topic confidence, so the ticket goes to human review. |
+| **Not sure who to ask** | Low topic confidence, so the ticket goes to human review, and Jeva tells the member a person will follow up. |
 | Pick "Someone else…" as sender | Unknown email, so a human case opens before any AI runs. |
 | Close the ticket, then send | The deterministic check stops it: no action. |
 

@@ -54,7 +54,8 @@ def _topic(message: str, earlier: str) -> tuple[str, float]:
         pbest, ptop = max(prev.items(), key=lambda kv: kv[1])
         if ptop:
             return pbest, 0.82
-        return "billing", 0.41
+        # Greetings and small talk: nothing about billing, orders or accounts.
+        return "general", 0.86
     if top == second:
         return best, 0.58
     return best, min(0.97, 0.8 + 0.05 * (top - second))
@@ -183,7 +184,7 @@ class _Messages:
             call = ("create_refund", {"order_id": order_id, "reason": reason})
         elif spec == "account" and re.search(r"log ?in|sign ?in|password|locked|reset|access", text.lower()):
             call = ("reset_password", {})
-        elif spec == "general":
+        elif spec == "general" and re.search(r"\b(human|person|someone|agent|representative)\b", text.lower()):
             call = ("create_human_case", {"reason": "Customer needs help from a person", "priority": ctx.get("priority", "normal")})
 
         if call:
@@ -222,7 +223,7 @@ class _Messages:
                 "orders": "I'd be glad to help with your order. Could you share the order number? It starts with the letter A, like A-123.",
                 "billing": "I can help with that. Which charge or invoice are you asking about, and what's the order number?",
                 "account": "happy to help with your account. What would you like to change or check?",
-                "general": "thanks for reaching out. Could you tell me a little more about what you need?",
+                "general": "thanks for reaching out. I can help with orders, billing and your account. What can I do for you today?",
             }[spec]
         name, r = results[0]
         if r.get("blocked") or (r.get("success") is False and "error" in r):

@@ -196,13 +196,18 @@ const TOPIC = {
   orders: /order|deliver|ship|package|track|arriv|return|supplies|sign for|parcel/g,
   account: /log ?in|sign ?in|password|locked|account|profile|portal|permission|access|reset|username/g,
 };
+// Fixed text (no LLM) so the member always hears back when a ticket goes to a person.
+function escalationReply(name, caseId) {
+  if (!name) return `Thanks for your message. We couldn't match this email address to a member account, so I've passed it to our support team (case ${caseId}). Someone will follow up with you.`;
+  return `Hi ${name.split(" ")[0]}, thanks for your message. I've passed it to a member of our support team (case ${caseId}), and they'll follow up with you here soon.`;
+}
 function topicOf(message, earlier) {
   const m = message.toLowerCase();
   const ranked = Object.entries(TOPIC).map(([k, re]) => [k, hits(re, m)]).sort((a, b) => b[1] - a[1]);
   const [[best, top], [, second]] = ranked;
   if (top === 0) {
     const prev = Object.entries(TOPIC).map(([k, re]) => [k, hits(re, earlier.toLowerCase())]).sort((a, b) => b[1] - a[1])[0];
-    return prev[1] ? [prev[0], 0.82] : ["billing", 0.41];
+    return prev[1] ? [prev[0], 0.82] : ["general", 0.86]; // greetings and small talk
   }
   if (top === second) return [best, 0.58];
   return [best, Math.min(0.97, 0.8 + 0.05 * (top - second))];
@@ -332,7 +337,7 @@ function llmDecideTool(spec, ctx, messages) {
   if (spec === "billing_specialist" && orderId && /refund|money back|charged twice|duplicate/.test(low))
     return { name: "create_refund", input: { order_id: orderId, reason: /twice|duplicate|double/.test(low) ? "Duplicate charge" : "Customer requested a refund" } };
   if (spec === "account_specialist" && /log ?in|sign ?in|password|locked|reset|access/.test(text.toLowerCase())) return { name: "reset_password", input: {} };
-  if (spec === "general_support") return { name: "create_human_case", input: { reason: "Customer needs help from a person", priority: ctx.priority } };
+  if (spec === "general_support" && /\b(human|person|someone|agent|representative)\b/.test(text.toLowerCase())) return { name: "create_human_case", input: { reason: "Customer needs help from a person", priority: ctx.priority } };
   return null;
 }
 
@@ -342,7 +347,7 @@ function llmBody(spec, results, lastUser) {
       orders_specialist: "I'd be glad to help with your order. Could you share the order number? It starts with the letter A, like A-123.",
       billing_specialist: "I can help with that. Which charge or invoice are you asking about, and what's the order number?",
       account_specialist: "happy to help with your account. What would you like to change or check?",
-      general_support: "thanks for reaching out. Could you tell me a little more about what you need?",
+      general_support: "thanks for reaching out. I can help with orders, billing and your account. What can I do for you today?",
     }[spec];
   }
   const [name, r] = results[0];
@@ -418,6 +423,7 @@ function handleTicket(ticket) {
     addMessage(ticket.id, "customer", ticket.message);
     const hc = toolCreateHumanCase(ticket.id, "Sender email does not match a customer", "normal", null);
     updateTicket(ticket.id, { status: "escalated", route: "unknown_customer" });
+    addMessage(ticket.id, "agent", escalationReply(null, hc.case_id));
     addMessage(ticket.id, "system", `Escalated to a person: case ${hc.case_id}.`);
     trace.route = "unknown_customer"; trace.human_case = hc;
     return { route: "unknown_customer", ticket_id: ticket.id, human_case: hc, trace };
@@ -453,6 +459,7 @@ function handleTicket(ticket) {
   if (human) {
     const hc = toolCreateHumanCase(ticket.id, "Low-confidence classification or ambiguous spam risk", repeat ? "high" : "normal", customer.id);
     updateTicket(ticket.id, { status: "escalated", topic: a.topic.choice, route: "human_review", priority: hc.priority });
+    addMessage(ticket.id, "agent", escalationReply(customer.name, hc.case_id));
     addMessage(ticket.id, "system", `Escalated to a person: case ${hc.case_id}.`);
     Object.assign(trace, { route: "human_review", priority: hc.priority, human_case: hc });
     return { route: "human_review", ticket_id: ticket.id, human_case: hc, trace };

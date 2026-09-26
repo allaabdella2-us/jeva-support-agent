@@ -61,7 +61,7 @@ function JevPanel({ trace, llm }) {
               {type === "Choice" && (
                 <>
                   <div className="opts">
-                    {["billing", "orders", "account"].map((o) => (
+                    {["billing", "orders", "account", "general"].map((o) => (
                       <span key={o} className={`opt${o === a.choice ? " on" : ""}`}>{o}</span>
                     ))}
                   </div>
